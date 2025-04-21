@@ -34,9 +34,9 @@ export const parseRouteIdFromUrl = (url: string): string | null => {
 /**
  * Fetches waypoints for a route from our server-side API endpoint
  */
-export const fetchRouteWaypoints = async (routeId: string): Promise<Waypoint[]> => {
+export const fetchRouteWaypoints = async (routeId: string, distance: string = '100'): Promise<Waypoint[]> => {
   try {
-    const response = await fetch(`${window.location.origin}/api/routeWaypoints/${routeId}`);
+    const response = await fetch(`${window.location.origin}/api/routeWaypoints/${routeId}?distance=${distance}`);
     
     if (!response.ok) {
       const errorData = await response.json();
@@ -62,5 +62,41 @@ export const fetchRouteWaypoints = async (routeId: string): Promise<Waypoint[]> 
     throw error instanceof Error 
       ? error 
       : new Error('Unknown error occurred while fetching route data');
+  }
+};
+
+interface RouteDistance {
+  distance: string;
+  label: string;
+}
+
+interface RouteInfo {
+  distances: RouteDistance[];
+}
+
+/**
+ * Fetches route info including available distances
+ */
+export const fetchRouteInfo = async (routeId: string): Promise<RouteInfo> => {
+  try {
+    const response = await fetch(`${window.location.origin}/api/routeInfo/${routeId}`);
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || `API responded with status: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching route info from server:', error);
+    
+    // Check if the error is likely due to the server not running
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      throw new Error('Cannot connect to the server. Please make sure the server is running by executing "node server/index.js" in a terminal window.');
+    }
+    
+    throw error instanceof Error 
+      ? error 
+      : new Error('Unknown error occurred while fetching route info');
   }
 };

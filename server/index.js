@@ -18,8 +18,8 @@ if (process.env.NODE_ENV !== 'production') {
   }));
 }
 
-// API Routes
-app.get('/api/routeWaypoints/:routeId', async (req, res) => {
+// API Routes - must be before the proxy middleware
+app.get('/api/routeInfo/:routeId', async (req, res) => {
   try {
     const { routeId } = req.params;
     
@@ -27,9 +27,66 @@ app.get('/api/routeWaypoints/:routeId', async (req, res) => {
       return res.status(400).json({ error: 'Route ID is required' });
     }
     
-    console.log(`Fetching waypoints for route: ${routeId}`);
+    console.log(`Fetching route info for: ${routeId}`);
     
-    const apiUrl = `https://www.fietssport.nl/apisite/waypoints/ride/${routeId}/100`;
+    const apiUrl = `https://www.fietssport.nl/toertochten/${routeId}`;
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'accept': 'text/html',
+        'accept-language': 'nl,en-US;q=0.9,en;q=0.8'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API responded with status: ${response.status} - ${response.statusText}`);
+    }
+    
+    const html = await response.text();
+    
+    // Parse the HTML to extract distances
+    const distances = [];
+    const regex = /data-afstabd="(\d+)">\s*(\d+)\s*km/g;
+    let match;
+    
+    while ((match = regex.exec(html)) !== null) {
+      distances.push({
+        distance: match[1],
+        label: `${match[2]} km`
+      });
+    }
+    
+    // If no distances found, add default 100km
+    if (distances.length === 0) {
+      distances.push({
+        distance: '100',
+        label: '100 km'
+      });
+    }
+    
+    res.json({ distances });
+  } catch (error) {
+    console.error('Error fetching route info:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch route info',
+      message: error.message 
+    });
+  }
+});
+
+app.get('/api/routeWaypoints/:routeId', async (req, res) => {
+  try {
+    const { routeId } = req.params;
+    const { distance = '100' } = req.query;
+    
+    if (!routeId) {
+      return res.status(400).json({ error: 'Route ID is required' });
+    }
+    
+    console.log(`Fetching waypoints for route: ${routeId} with distance: ${distance}`);
+    
+    const apiUrl = `https://www.fietssport.nl/apisite/waypoints/ride/${routeId}/${distance}`;
     
     const response = await fetch(apiUrl, {
       method: 'POST',

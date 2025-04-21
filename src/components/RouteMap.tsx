@@ -7,6 +7,7 @@ import {
   Polyline,
   Marker,
   Popup,
+  useMap,
 } from "react-leaflet";
 import L, { LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -22,11 +23,77 @@ const defaultIcon = L.icon({
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
 });
+
 L.Marker.prototype.options.icon = defaultIcon;
 
 interface RouteMapProps {
   waypoints: Waypoint[];
 }
+
+// Custom animated polyline component
+const AnimatedPolyline: React.FC<{ positions: LatLngTuple[] }> = ({
+  positions,
+}) => {
+  const map = useMap();
+  const polylineRef = useRef<L.Polyline | null>(null);
+  const animationRef = useRef<number | null>(null);
+  const offsetRef = useRef(0);
+
+  useEffect(() => {
+    if (!polylineRef.current) return;
+
+    const animate = () => {
+      offsetRef.current = (offsetRef.current - 0.1) % 30;
+      polylineRef.current?.setStyle({
+        dashOffset: offsetRef.current.toString(),
+      });
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, []);
+
+  return (
+    <Polyline
+      positions={positions}
+      pathOptions={{
+        color: "#3B82F6",
+        weight: 5,
+        dashArray: "10, 8",
+      }}
+      ref={(ref) => {
+        if (ref) {
+          polylineRef.current = ref;
+        }
+      }}
+    />
+  );
+};
+
+// Component to handle map bounds updates
+const MapBoundsUpdater: React.FC<{ waypoints: Waypoint[] }> = ({
+  waypoints,
+}) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (waypoints.length > 0) {
+      const bounds = waypoints.reduce((acc, waypoint) => {
+        return acc.extend([waypoint.lat, waypoint.lng]);
+      }, L.latLngBounds([waypoints[0].lat, waypoints[0].lng], [waypoints[0].lat, waypoints[0].lng]));
+
+      map.fitBounds(bounds, { padding: [20, 20], maxZoom: 14 });
+    }
+  }, [waypoints, map]);
+
+  return null;
+};
 
 const RouteMap: React.FC<RouteMapProps> = ({ waypoints }) => {
   if (!waypoints.length) {
@@ -40,11 +107,6 @@ const RouteMap: React.FC<RouteMapProps> = ({ waypoints }) => {
     );
   }
 
-  // Calculate bounds for the map
-  const bounds = waypoints.reduce((acc, waypoint) => {
-    return acc.extend([waypoint.lat, waypoint.lng]);
-  }, L.latLngBounds([waypoints[0].lat, waypoints[0].lng], [waypoints[0].lat, waypoints[0].lng]));
-
   // Create polyline positions
   const positions: LatLngTuple[] = waypoints.map(
     (waypoint) => [waypoint.lat, waypoint.lng] as LatLngTuple
@@ -52,18 +114,17 @@ const RouteMap: React.FC<RouteMapProps> = ({ waypoints }) => {
 
   return (
     <MapContainer
-      bounds={bounds}
+      center={[waypoints[0].lat, waypoints[0].lng]}
+      zoom={14}
       className="h-full w-full"
       style={{ height: "100%", width: "100%" }}
     >
+      <MapBoundsUpdater waypoints={waypoints} />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <Polyline
-        positions={positions}
-        pathOptions={{ color: "#3B82F6", weight: 5 }}
-      />
+      <AnimatedPolyline positions={positions} />
       <Marker position={[waypoints[0].lat, waypoints[0].lng]}>
         <Popup>Start</Popup>
       </Marker>

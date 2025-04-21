@@ -1,17 +1,33 @@
-import React, { useState } from 'react';
-import { AlertCircle, DownloadCloud, Loader, Check, Map } from 'lucide-react';
-import RouteMap from './RouteMap';
-import { fetchRouteWaypoints, parseRouteIdFromUrl } from '../utils/routeUtils';
-import { generateGpxFile } from '../utils/gpxGenerator';
-import { Waypoint } from '../types/route';
+import React, { useState } from "react";
+import { AlertCircle, DownloadCloud, Loader, Check, Map } from "lucide-react";
+import RouteMap from "./RouteMap";
+import {
+  fetchRouteWaypoints,
+  parseRouteIdFromUrl,
+  fetchRouteInfo,
+} from "../utils/routeUtils";
+import { generateGpxFile } from "../utils/gpxGenerator";
+import { Waypoint } from "../types/route";
+
+interface RouteDistance {
+  distance: string;
+  label: string;
+}
 
 const RouteConverter: React.FC = () => {
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
-  const [routeInfo, setRouteInfo] = useState<{ id: string; name: string } | null>(null);
-  const [recentUrls, setRecentUrls] = useState<{ url: string, date: string }[]>([]);
+  const [routeInfo, setRouteInfo] = useState<{
+    id: string;
+    name: string;
+    distances: RouteDistance[];
+  } | null>(null);
+  const [recentUrls, setRecentUrls] = useState<{ url: string; date: string }[]>(
+    []
+  );
+  const [selectedDistance, setSelectedDistance] = useState<string>("100");
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUrl(e.target.value);
@@ -20,41 +36,50 @@ const RouteConverter: React.FC = () => {
 
   const handleConvert = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!url.trim()) {
-      setError('Please enter a URL');
+      setError("Please enter a URL");
       return;
     }
-    
-    if (!url.includes('fietssport.nl/toertochten/')) {
-      setError('Please enter a valid fietssport.nl toertocht URL');
+
+    if (!url.includes("fietssport.nl/toertochten/")) {
+      setError("Please enter a valid fietssport.nl toertocht URL");
       return;
     }
-    
+
     const routeId = parseRouteIdFromUrl(url);
-    
+
     if (!routeId) {
-      setError('Could not parse route ID from URL');
+      setError("Could not parse route ID from URL");
       return;
     }
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
-      const data = await fetchRouteWaypoints(routeId);
+      // Fetch route info and available distances
+      const routeInfo = await fetchRouteInfo(routeId);
+
+      setRouteInfo({
+        id: routeId,
+        name: extractRouteName(url),
+        distances: routeInfo.distances,
+      });
+
+      // Fetch waypoints for the default distance
+      const data = await fetchRouteWaypoints(routeId, selectedDistance);
       setWaypoints(data);
-      setRouteInfo({ id: routeId, name: extractRouteName(url) });
-      
+
       // Add to recent URLs
       const newRecentUrl = { url, date: new Date().toLocaleString() };
-      setRecentUrls(prev => [newRecentUrl, ...prev.slice(0, 4)]);
-      
+      setRecentUrls((prev) => [newRecentUrl, ...prev.slice(0, 4)]);
     } catch (err) {
-      const errorMessage = err instanceof Error 
-        ? err.message 
-        : 'Failed to fetch route data. Please check the URL and try again.';
-      
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Failed to fetch route data. Please check the URL and try again.";
+
       setError(errorMessage);
       console.error(err);
     } finally {
@@ -62,14 +87,33 @@ const RouteConverter: React.FC = () => {
     }
   };
 
+  const handleDistanceChange = async (distance: string) => {
+    if (!routeInfo) return;
+
+    setLoading(true);
+    setSelectedDistance(distance);
+
+    try {
+      const data = await fetchRouteWaypoints(routeInfo.id, distance);
+      setWaypoints(data);
+    } catch (err) {
+      console.error("Error fetching waypoints for distance:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const extractRouteName = (url: string): string => {
     try {
-      const pathSegments = new URL(url).pathname.split('/');
+      const pathSegments = new URL(url).pathname.split("/");
       // The last segment should be the route name
       const lastSegment = pathSegments[pathSegments.length - 1];
-      return lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1).replace(/-/g, ' ');
+      return (
+        lastSegment.charAt(0).toUpperCase() +
+        lastSegment.slice(1).replace(/-/g, " ")
+      );
     } catch {
-      return 'Cycling Route';
+      return "Cycling Route";
     }
   };
 
@@ -85,14 +129,16 @@ const RouteConverter: React.FC = () => {
   };
 
   const handlePasteExample = () => {
-    setUrl('https://www.fietssport.nl/toertochten/56186/bultentocht');
+    setUrl("https://www.fietssport.nl/toertochten/56186/bultentocht");
   };
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       <div className="p-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Convert Route to GPX</h2>
-        
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">
+          Convert Route to GPX
+        </h2>
+
         <form onSubmit={handleConvert} className="mb-6">
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex-grow relative">
@@ -114,7 +160,11 @@ const RouteConverter: React.FC = () => {
               disabled={loading}
               className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
-              {loading ? <Loader className="animate-spin mr-2" size={18} /> : <Map className="mr-2" size={18} />}
+              {loading ? (
+                <Loader className="animate-spin mr-2" size={18} />
+              ) : (
+                <Map className="mr-2" size={18} />
+              )}
               Convert
             </button>
           </div>
@@ -124,8 +174,8 @@ const RouteConverter: React.FC = () => {
             </p>
           )}
           <div className="mt-2 text-sm text-gray-500">
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={handlePasteExample}
               className="text-blue-500 hover:underline"
             >
@@ -136,14 +186,19 @@ const RouteConverter: React.FC = () => {
 
         {recentUrls.length > 0 && !waypoints.length && (
           <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Recent conversions</h3>
+            <h3 className="text-sm font-medium text-gray-500 mb-2">
+              Recent conversions
+            </h3>
             <div className="space-y-2">
               {recentUrls.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm"
+                >
                   <div className="truncate flex-grow">
                     <span className="font-medium">{item.url}</span>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setUrl(item.url)}
                     className="text-blue-500 hover:text-blue-700 ml-2"
                   >
@@ -159,7 +214,9 @@ const RouteConverter: React.FC = () => {
           <div className="mt-8 animation-fade-in">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-lg font-medium text-gray-800">{routeInfo.name}</h3>
+                <h3 className="text-lg font-medium text-gray-800">
+                  {routeInfo.name}
+                </h3>
                 <p className="text-sm text-gray-500">
                   {waypoints.length} waypoints found
                 </p>
@@ -180,15 +237,36 @@ const RouteConverter: React.FC = () => {
                 </button>
               </div>
             </div>
-            
+
+            {routeInfo.distances.length > 1 && (
+              <div className="mb-4">
+                <div className="flex space-x-2 overflow-x-auto pb-2">
+                  {routeInfo.distances.map(({ distance, label }) => (
+                    <button
+                      key={distance}
+                      onClick={() => handleDistanceChange(distance)}
+                      className={`px-4 py-2 rounded-lg transition-colors ${
+                        selectedDistance === distance
+                          ? "bg-blue-500 text-white"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="bg-gray-100 rounded-lg overflow-hidden h-80 md:h-96">
               <RouteMap waypoints={waypoints} />
             </div>
-            
+
             <div className="mt-4 text-sm text-gray-600">
               <p className="flex items-center">
                 <Check size={16} className="mr-2 text-green-500" />
-                Route data successfully retrieved and converted. Use the download button to save as GPX.
+                Route data successfully retrieved and converted. Use the
+                download button to save as GPX.
               </p>
             </div>
           </div>

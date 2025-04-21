@@ -29,6 +29,21 @@ body {
   }
 }
 
+/* Marching ants animation for the route */
+.marching-ants {
+  stroke-dasharray: 20, 10;
+  animation: marching-ants 0.5s linear infinite;
+}
+
+@keyframes marching-ants {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -30;
+  }
+}
+
 /* RouteMap animation */
 @keyframes dash {
   to {
