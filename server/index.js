@@ -94,7 +94,11 @@ app.get('/api/routeWaypoints/:routeId', async (req, res) => {
         'accept': '*/*',
         'accept-language': 'nl,en-US;q=0.9,en;q=0.8',
         'content-type': 'application/json'
-      }
+      },
+      body: JSON.stringify({
+        routeId: routeId,
+        distance: distance
+      })
     });
     
     if (!response.ok) {

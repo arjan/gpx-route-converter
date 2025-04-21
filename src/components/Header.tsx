@@ -1,5 +1,5 @@
-import React from 'react';
-import { Bike, Map } from 'lucide-react';
+import React from "react";
+import { Bike, Map } from "lucide-react";
 
 const Header: React.FC = () => {
   return (
@@ -8,14 +8,16 @@ const Header: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Bike className="text-blue-500" size={24} />
-            <span className="text-xl font-bold text-gray-800">RouteGPX</span>
+            <span className="text-xl font-bold text-gray-800">
+              Toertocht GPX
+            </span>
           </div>
           <nav>
             <ul className="flex items-center space-x-6">
               <li>
-                <a 
-                  href="https://www.fietssport.nl/toertochten" 
-                  target="_blank" 
+                <a
+                  href="https://www.fietssport.nl/toertochten"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center text-gray-600 hover:text-blue-500 transition-colors"
                 >
