@@ -67,8 +67,12 @@ const RouteConverter: React.FC = () => {
         distances: routeInfo.distances,
       });
 
-      // Fetch waypoints for the default distance
-      const data = await fetchRouteWaypoints(routeId, selectedDistance);
+      // Select the first available distance
+      const firstDistance = routeInfo.distances[0].distance;
+      setSelectedDistance(firstDistance);
+
+      // Fetch waypoints for the first available distance
+      const data = await fetchRouteWaypoints(routeId, firstDistance);
       setWaypoints(data);
 
       // Add to recent URLs
