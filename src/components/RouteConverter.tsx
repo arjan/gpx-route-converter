@@ -29,6 +29,7 @@ const RouteConverter: React.FC = () => {
     []
   );
   const [selectedDistance, setSelectedDistance] = useState<string>("100");
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUrl(e.target.value);
@@ -264,10 +265,18 @@ const RouteConverter: React.FC = () => {
             )}
 
             <div className="bg-gray-100 rounded-lg overflow-hidden h-80 md:h-96">
-              <RouteMap waypoints={waypoints} />
+              <RouteMap
+                waypoints={waypoints}
+                currentIndex={currentIndex}
+                onIndexChange={setCurrentIndex}
+              />
             </div>
 
-            <HeightProfile waypoints={waypoints} />
+            <HeightProfile
+              waypoints={waypoints}
+              currentIndex={currentIndex}
+              onIndexChange={setCurrentIndex}
+            />
 
             <div className="mt-4 text-sm text-gray-600">
               <p className="flex items-center">

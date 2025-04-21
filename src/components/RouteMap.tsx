@@ -28,16 +28,31 @@ L.Marker.prototype.options.icon = defaultIcon;
 
 interface RouteMapProps {
   waypoints: Waypoint[];
+  currentIndex: number;
+  onIndexChange: (index: number) => void;
+  isHovering?: boolean;
 }
 
 // Component to handle map bounds updates and animated dot
-const MapBoundsUpdater: React.FC<{ waypoints: Waypoint[] }> = ({
-  waypoints,
-}) => {
+const MapBoundsUpdater: React.FC<{
+  waypoints: Waypoint[];
+  currentIndex: number;
+  onIndexChange: (index: number) => void;
+  isHovering?: boolean;
+}> = ({ waypoints, currentIndex, onIndexChange, isHovering }) => {
   const map = useMap();
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const animationRef = useRef<number | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (waypoints.length > 0) {
@@ -51,18 +66,14 @@ const MapBoundsUpdater: React.FC<{ waypoints: Waypoint[] }> = ({
 
   // Animate the dot
   useEffect(() => {
-    if (waypoints.length <= 1 || isHovered) return;
+    if (waypoints.length <= 1 || isHovered || isHovering) return;
 
     let lastTime = performance.now();
     const animate = (currentTime: number) => {
-      if (isHovered) return;
       const deltaTime = currentTime - lastTime;
       if (deltaTime >= 50) {
         // Only update every 50ms (20fps)
-        setCurrentIndex((prevIndex) => {
-          const nextIndex = (prevIndex + 1) % waypoints.length;
-          return nextIndex;
-        });
+        onIndexChange((currentIndex + 1) % waypoints.length);
         lastTime = currentTime;
       }
       animationRef.current = requestAnimationFrame(animate);
@@ -75,7 +86,7 @@ const MapBoundsUpdater: React.FC<{ waypoints: Waypoint[] }> = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [waypoints.length, isHovered]);
+  }, [waypoints.length, isHovered, isHovering, currentIndex, onIndexChange]);
 
   // Create a custom icon for the moving dot
   const movingDotIcon = L.divIcon({
@@ -103,25 +114,37 @@ const MapBoundsUpdater: React.FC<{ waypoints: Waypoint[] }> = ({
 
   // Handle polyline hover events
   const handleMouseOver = (e: L.LeafletMouseEvent) => {
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
     setIsHovered(true);
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     }
     const closestIndex = findClosestWaypoint(e.latlng);
-    setCurrentIndex(closestIndex);
+    onIndexChange(closestIndex);
   };
 
   const handleMouseMove = (e: L.LeafletMouseEvent) => {
     if (isHovered) {
       const closestIndex = findClosestWaypoint(e.latlng);
-      setCurrentIndex(closestIndex);
+      onIndexChange(closestIndex);
     }
   };
 
   const handleMouseOut = () => {
-    setIsHovered(false);
-    // Don't restart animation, just keep the dot at its last position
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    // Set new timeout
+    timeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+      timeoutRef.current = null;
+    }, 10000);
   };
 
   return (
@@ -152,7 +175,12 @@ const MapBoundsUpdater: React.FC<{ waypoints: Waypoint[] }> = ({
   );
 };
 
-const RouteMap: React.FC<RouteMapProps> = ({ waypoints }) => {
+const RouteMap: React.FC<RouteMapProps> = ({
+  waypoints,
+  currentIndex,
+  onIndexChange,
+  isHovering,
+}) => {
   if (!waypoints.length) {
     return (
       <div className="h-full flex items-center justify-center bg-gray-100">
@@ -171,7 +199,12 @@ const RouteMap: React.FC<RouteMapProps> = ({ waypoints }) => {
       className="h-full w-full"
       style={{ height: "100%", width: "100%" }}
     >
-      <MapBoundsUpdater waypoints={waypoints} />
+      <MapBoundsUpdater
+        waypoints={waypoints}
+        currentIndex={currentIndex}
+        onIndexChange={onIndexChange}
+        isHovering={isHovering}
+      />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

@@ -1,18 +1,26 @@
-import React from "react";
+import React, { useState } from "react";
 import { Waypoint } from "../types/route";
 import { TrendingUp } from "lucide-react";
 
 interface HeightProfileProps {
   waypoints: Waypoint[];
+  currentIndex: number;
+  onIndexChange: (index: number) => void;
 }
 
-const HeightProfile: React.FC<HeightProfileProps> = ({ waypoints }) => {
+const HeightProfile: React.FC<HeightProfileProps> = ({
+  waypoints,
+  currentIndex,
+  onIndexChange,
+}) => {
+  const [isHovering, setIsHovering] = useState(false);
+
   if (!waypoints.length) return null;
 
   // Calculate dimensions and scaling factors
   const width = 800;
   const height = 200;
-  const padding = 20;
+  const padding = 40;
 
   // Find min and max elevation
   const elevations = waypoints.map((w) => w.hoogte);
@@ -32,11 +40,11 @@ const HeightProfile: React.FC<HeightProfileProps> = ({ waypoints }) => {
       padding -
       ((waypoint.hoogte - minElevation) / elevationRange) *
         (height - 2 * padding);
-    return `${x},${y}`;
+    return { x, y, index };
   });
 
   // Create the path string
-  const pathData = `M ${points.join(" L ")}`;
+  const pathData = `M ${points.map((p) => `${p.x},${p.y}`).join(" L ")}`;
 
   // Calculate total ascent and descent
   let totalAscent = 0;
@@ -46,6 +54,23 @@ const HeightProfile: React.FC<HeightProfileProps> = ({ waypoints }) => {
     if (diff > 0) totalAscent += diff;
     else totalDescent += Math.abs(diff);
   }
+
+  // Calculate current position x coordinate
+  const currentX =
+    padding + (currentIndex / (waypoints.length - 1)) * (width - 2 * padding);
+
+  // Handle mouse move on the path
+  const handleMouseMove = (e: React.MouseEvent<SVGPathElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const svgWidth = rect.width;
+    const relativeX = (x / svgWidth) * width;
+    const progress = (relativeX - padding) / (width - 2 * padding);
+    const newIndex = Math.round(progress * (waypoints.length - 1));
+    if (newIndex >= 0 && newIndex < waypoints.length) {
+      onIndexChange(newIndex);
+    }
+  };
 
   return (
     <div className="mt-6 bg-white rounded-lg shadow-md p-6">
@@ -71,6 +96,19 @@ const HeightProfile: React.FC<HeightProfileProps> = ({ waypoints }) => {
             ))}
           </g>
 
+          {/* Transparent overlay for mouse events */}
+          <rect
+            x={padding}
+            y={padding}
+            width={width - 2 * padding}
+            height={height - 2 * padding}
+            fill="transparent"
+            onMouseMove={handleMouseMove}
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => setIsHovering(false)}
+            style={{ cursor: "pointer" }}
+          />
+
           {/* Filled area */}
           <defs>
             <linearGradient id="elevationGradient" x1="0" x2="0" y1="0" y2="1">
@@ -88,6 +126,38 @@ const HeightProfile: React.FC<HeightProfileProps> = ({ waypoints }) => {
 
           {/* Elevation line */}
           <path d={pathData} fill="none" stroke="#3B82F6" strokeWidth="2" />
+
+          {/* Current position line */}
+          <line
+            x1={currentX}
+            y1={padding}
+            x2={currentX}
+            y2={height - padding}
+            stroke="rgba(128, 128, 128, 0.8)"
+            strokeWidth="1"
+            strokeDasharray="2,2"
+          />
+          {/* Current position dot */}
+          <circle
+            cx={currentX}
+            cy={
+              height -
+              padding -
+              ((waypoints[currentIndex].hoogte - minElevation) /
+                elevationRange) *
+                (height - 2 * padding)
+            }
+            r="4"
+            fill="#3B82F6"
+          />
+          {/* Current height label */}
+          <text
+            x={currentX + 5}
+            y={padding + 15}
+            className="text-xs text-gray-600"
+          >
+            {waypoints[currentIndex].hoogte.toFixed(0)}m
+          </text>
 
           {/* Start and end points */}
           <circle
