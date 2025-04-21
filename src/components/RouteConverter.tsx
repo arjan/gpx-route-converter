@@ -30,6 +30,7 @@ const RouteConverter: React.FC = () => {
   );
   const [selectedDistance, setSelectedDistance] = useState<string>("100");
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isHovering, setIsHovering] = useState(false);
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUrl(e.target.value);
@@ -125,7 +126,7 @@ const RouteConverter: React.FC = () => {
 
   const handleDownloadGpx = () => {
     if (waypoints.length && routeInfo) {
-      generateGpxFile(waypoints, routeInfo.name);
+      generateGpxFile(waypoints, routeInfo.name, selectedDistance);
     }
   };
 
@@ -269,6 +270,7 @@ const RouteConverter: React.FC = () => {
                 waypoints={waypoints}
                 currentIndex={currentIndex}
                 onIndexChange={setCurrentIndex}
+                isHovering={isHovering}
               />
             </div>
 
@@ -276,6 +278,7 @@ const RouteConverter: React.FC = () => {
               waypoints={waypoints}
               currentIndex={currentIndex}
               onIndexChange={setCurrentIndex}
+              onHoverChange={setIsHovering}
             />
 
             <div className="mt-4 text-sm text-gray-600">

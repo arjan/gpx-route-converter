@@ -3,7 +3,7 @@ import { Waypoint } from '../types/route';
 /**
  * Generates a GPX file from waypoints and triggers download
  */
-export const generateGpxFile = (waypoints: Waypoint[], routeName: string): void => {
+export const generateGpxFile = (waypoints: Waypoint[], routeName: string, distance: string): void => {
   // Create GPX content
   const gpxContent = generateGpxContent(waypoints, routeName);
   
@@ -16,7 +16,7 @@ export const generateGpxFile = (waypoints: Waypoint[], routeName: string): void 
   // Create a temporary link element to trigger the download
   const link = document.createElement('a');
   link.href = url;
-  link.download = `${routeName.replace(/\s+/g, '_')}.gpx`;
+  link.download = `${routeName.replace(/\s+/g, '_')}_${distance}km.gpx`;
   
   // Append the link to the body
   document.body.appendChild(link);

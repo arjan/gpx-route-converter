@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Waypoint } from "../types/route";
 import { TrendingUp } from "lucide-react";
 
@@ -6,14 +6,20 @@ interface HeightProfileProps {
   waypoints: Waypoint[];
   currentIndex: number;
   onIndexChange: (index: number) => void;
+  onHoverChange: (isHovering: boolean) => void;
 }
 
 const HeightProfile: React.FC<HeightProfileProps> = ({
   waypoints,
   currentIndex,
   onIndexChange,
+  onHoverChange,
 }) => {
   const [isHovering, setIsHovering] = useState(false);
+
+  useEffect(() => {
+    onHoverChange(isHovering);
+  }, [isHovering, onHoverChange]);
 
   if (!waypoints.length) return null;
 
