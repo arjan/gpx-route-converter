@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Waypoint } from "../types/route";
 import { MapPin } from "lucide-react";
 import {
@@ -30,57 +30,14 @@ interface RouteMapProps {
   waypoints: Waypoint[];
 }
 
-// Custom animated polyline component
-const AnimatedPolyline: React.FC<{ positions: LatLngTuple[] }> = ({
-  positions,
-}) => {
-  const map = useMap();
-  const polylineRef = useRef<L.Polyline | null>(null);
-  const animationRef = useRef<number | null>(null);
-  const offsetRef = useRef(0);
-
-  useEffect(() => {
-    if (!polylineRef.current) return;
-
-    const animate = () => {
-      offsetRef.current = (offsetRef.current - 0.1) % 30;
-      polylineRef.current?.setStyle({
-        dashOffset: offsetRef.current.toString(),
-      });
-      animationRef.current = requestAnimationFrame(animate);
-    };
-
-    animationRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, []);
-
-  return (
-    <Polyline
-      positions={positions}
-      pathOptions={{
-        color: "#3B82F6",
-        weight: 5,
-        dashArray: "10, 8",
-      }}
-      ref={(ref) => {
-        if (ref) {
-          polylineRef.current = ref;
-        }
-      }}
-    />
-  );
-};
-
-// Component to handle map bounds updates
+// Component to handle map bounds updates and animated dot
 const MapBoundsUpdater: React.FC<{ waypoints: Waypoint[] }> = ({
   waypoints,
 }) => {
   const map = useMap();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+  const animationRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (waypoints.length > 0) {
@@ -92,7 +49,107 @@ const MapBoundsUpdater: React.FC<{ waypoints: Waypoint[] }> = ({
     }
   }, [waypoints, map]);
 
-  return null;
+  // Animate the dot
+  useEffect(() => {
+    if (waypoints.length <= 1 || isHovered) return;
+
+    let lastTime = performance.now();
+    const animate = (currentTime: number) => {
+      if (isHovered) return;
+      const deltaTime = currentTime - lastTime;
+      if (deltaTime >= 50) {
+        // Only update every 50ms (20fps)
+        setCurrentIndex((prevIndex) => {
+          const nextIndex = (prevIndex + 1) % waypoints.length;
+          return nextIndex;
+        });
+        lastTime = currentTime;
+      }
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [waypoints.length, isHovered]);
+
+  // Create a custom icon for the moving dot
+  const movingDotIcon = L.divIcon({
+    className: "moving-dot",
+    html: '<div class="w-3 h-3 bg-blue-500 rounded-full shadow-lg"></div>',
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+  });
+
+  // Find the closest waypoint to a given latlng
+  const findClosestWaypoint = (latlng: L.LatLng): number => {
+    let closestIndex = 0;
+    let minDistance = Infinity;
+
+    waypoints.forEach((waypoint, index) => {
+      const distance = latlng.distanceTo(L.latLng(waypoint.lat, waypoint.lng));
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestIndex = index;
+      }
+    });
+
+    return closestIndex;
+  };
+
+  // Handle polyline hover events
+  const handleMouseOver = (e: L.LeafletMouseEvent) => {
+    setIsHovered(true);
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+    const closestIndex = findClosestWaypoint(e.latlng);
+    setCurrentIndex(closestIndex);
+  };
+
+  const handleMouseMove = (e: L.LeafletMouseEvent) => {
+    if (isHovered) {
+      const closestIndex = findClosestWaypoint(e.latlng);
+      setCurrentIndex(closestIndex);
+    }
+  };
+
+  const handleMouseOut = () => {
+    setIsHovered(false);
+    // Don't restart animation, just keep the dot at its last position
+  };
+
+  return (
+    <>
+      <Polyline
+        positions={waypoints.map((w) => [w.lat, w.lng])}
+        pathOptions={{
+          color: "#3B82F6",
+          weight: 5,
+        }}
+        eventHandlers={{
+          mouseover: handleMouseOver,
+          mousemove: handleMouseMove,
+          mouseout: handleMouseOut,
+        }}
+      />
+      {currentIndex < waypoints.length && (
+        <Marker
+          position={[waypoints[currentIndex].lat, waypoints[currentIndex].lng]}
+          icon={movingDotIcon}
+          eventHandlers={{
+            mouseover: handleMouseOver,
+            mouseout: handleMouseOut,
+          }}
+        />
+      )}
+    </>
+  );
 };
 
 const RouteMap: React.FC<RouteMapProps> = ({ waypoints }) => {
@@ -107,11 +164,6 @@ const RouteMap: React.FC<RouteMapProps> = ({ waypoints }) => {
     );
   }
 
-  // Create polyline positions
-  const positions: LatLngTuple[] = waypoints.map(
-    (waypoint) => [waypoint.lat, waypoint.lng] as LatLngTuple
-  );
-
   return (
     <MapContainer
       center={[waypoints[0].lat, waypoints[0].lng]}
@@ -124,7 +176,6 @@ const RouteMap: React.FC<RouteMapProps> = ({ waypoints }) => {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <AnimatedPolyline positions={positions} />
       <Marker position={[waypoints[0].lat, waypoints[0].lng]}>
         <Popup>Start</Popup>
       </Marker>

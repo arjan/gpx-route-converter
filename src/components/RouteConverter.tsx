@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { AlertCircle, DownloadCloud, Loader, Check, Map } from "lucide-react";
 import RouteMap from "./RouteMap";
+import HeightProfile from "./HeightProfile";
 import {
   fetchRouteWaypoints,
   parseRouteIdFromUrl,
@@ -265,6 +266,8 @@ const RouteConverter: React.FC = () => {
             <div className="bg-gray-100 rounded-lg overflow-hidden h-80 md:h-96">
               <RouteMap waypoints={waypoints} />
             </div>
+
+            <HeightProfile waypoints={waypoints} />
 
             <div className="mt-4 text-sm text-gray-600">
               <p className="flex items-center">
