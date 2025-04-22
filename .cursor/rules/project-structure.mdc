@@ -1,0 +1,12 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Project structure
+
+- Put each React component into its own file
+
+- Put helper functions in a separate file in util/
+- Put React hook functions (useFoo) in a separate file in hooks/ (eg hooks/use-foo.ts)
+  

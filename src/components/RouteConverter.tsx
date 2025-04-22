@@ -2,137 +2,32 @@ import React, { useState } from "react";
 import { AlertCircle, DownloadCloud, Loader, Check, Map } from "lucide-react";
 import RouteMap from "./RouteMap";
 import HeightProfile from "./HeightProfile";
-import {
-  fetchRouteWaypoints,
-  parseRouteIdFromUrl,
-  fetchRouteInfo,
-} from "../utils/routeUtils";
 import { generateGpxFile } from "../utils/gpxGenerator";
-import { Waypoint } from "../types/route";
-
-interface RouteDistance {
-  distance: string;
-  label: string;
-}
+import { useRouteConverter } from "../hooks/useRouteConverter";
 
 const RouteConverter: React.FC = () => {
-  const [url, setUrl] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
-  const [routeInfo, setRouteInfo] = useState<{
-    id: string;
-    name: string;
-    distances: RouteDistance[];
-  } | null>(null);
-  const [recentUrls, setRecentUrls] = useState<{ url: string; date: string }[]>(
-    []
-  );
-  const [selectedDistance, setSelectedDistance] = useState<string>("100");
+  const {
+    url,
+    setUrl,
+    loading,
+    error,
+    waypoints,
+    routeInfo,
+    recentUrls,
+    selectedDistance,
+    handleUrlChange,
+    handleConvert,
+    handleDistanceChange,
+    handleClearResults,
+  } = useRouteConverter();
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
-
-  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUrl(e.target.value);
-    setError(null);
-  };
-
-  const handleConvert = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!url.trim()) {
-      setError("Please enter a URL");
-      return;
-    }
-
-    if (!url.includes("fietssport.nl/toertochten/")) {
-      setError("Please enter a valid fietssport.nl toertocht URL");
-      return;
-    }
-
-    const routeId = parseRouteIdFromUrl(url);
-
-    if (!routeId) {
-      setError("Could not parse route ID from URL");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Fetch route info and available distances
-      const routeInfo = await fetchRouteInfo(routeId);
-
-      setRouteInfo({
-        id: routeId,
-        name: extractRouteName(url),
-        distances: routeInfo.distances,
-      });
-
-      // Select the first available distance
-      const firstDistance = routeInfo.distances[0].distance;
-      setSelectedDistance(firstDistance);
-
-      // Fetch waypoints for the first available distance
-      const data = await fetchRouteWaypoints(routeId, firstDistance);
-      setWaypoints(data);
-
-      // Add to recent URLs
-      const newRecentUrl = { url, date: new Date().toLocaleString() };
-      setRecentUrls((prev) => [newRecentUrl, ...prev.slice(0, 4)]);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Failed to fetch route data. Please check the URL and try again.";
-
-      setError(errorMessage);
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDistanceChange = async (distance: string) => {
-    if (!routeInfo) return;
-
-    setLoading(true);
-    setSelectedDistance(distance);
-
-    try {
-      const data = await fetchRouteWaypoints(routeInfo.id, distance);
-      setWaypoints(data);
-    } catch (err) {
-      console.error("Error fetching waypoints for distance:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const extractRouteName = (url: string): string => {
-    try {
-      const pathSegments = new URL(url).pathname.split("/");
-      // The last segment should be the route name
-      const lastSegment = pathSegments[pathSegments.length - 1];
-      return (
-        lastSegment.charAt(0).toUpperCase() +
-        lastSegment.slice(1).replace(/-/g, " ")
-      );
-    } catch {
-      return "Cycling Route";
-    }
-  };
 
   const handleDownloadGpx = () => {
     if (waypoints.length && routeInfo) {
       generateGpxFile(waypoints, routeInfo.name, selectedDistance);
     }
-  };
-
-  const handleClearResults = () => {
-    setWaypoints([]);
-    setRouteInfo(null);
   };
 
   const handlePasteExample = () => {
@@ -200,94 +95,76 @@ const RouteConverter: React.FC = () => {
               {recentUrls.map((item, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm"
+                  className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
                 >
-                  <div className="truncate flex-grow">
-                    <span className="font-medium">{item.url}</span>
-                  </div>
-                  <button
-                    onClick={() => setUrl(item.url)}
-                    className="text-blue-500 hover:text-blue-700 ml-2"
-                  >
-                    Use
-                  </button>
+                  <span className="text-sm text-gray-600">{item.url}</span>
+                  <span className="text-xs text-gray-400">{item.date}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {waypoints.length > 0 && routeInfo && (
-          <div className="mt-8 animation-fade-in">
+        {routeInfo && (
+          <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-medium text-gray-800">
-                  {routeInfo.name}
-                </h3>
-                <p className="text-sm text-gray-500">
-                  {waypoints.length} waypoints found
-                </p>
+              <h3 className="text-lg font-medium text-gray-800">
+                {routeInfo.name}
+              </h3>
+              <button
+                onClick={handleClearResults}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                Clear results
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select distance
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {routeInfo.distances.map((distance) => (
+                  <button
+                    key={distance.distance}
+                    onClick={() => handleDistanceChange(distance.distance)}
+                    className={`px-3 py-1 rounded-lg text-sm ${
+                      selectedDistance === distance.distance
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {distance.label}
+                  </button>
+                ))}
               </div>
-              <div className="flex space-x-2">
+            </div>
+
+            {waypoints.length > 0 && (
+              <div className="space-y-4">
+                <div className="bg-gray-100 rounded-lg overflow-hidden h-80 md:h-96">
+                  <RouteMap
+                    waypoints={waypoints}
+                    currentIndex={currentIndex}
+                    onIndexChange={setCurrentIndex}
+                    isHovering={isHovering}
+                  />
+                </div>
+                <HeightProfile
+                  waypoints={waypoints}
+                  currentIndex={currentIndex}
+                  onIndexChange={setCurrentIndex}
+                  onHoverChange={setIsHovering}
+                />
                 <button
                   onClick={handleDownloadGpx}
-                  className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 flex items-center"
+                  className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center"
                 >
-                  <DownloadCloud size={18} className="mr-2" />
+                  <DownloadCloud className="mr-2" size={18} />
                   Download GPX
                 </button>
-                <button
-                  onClick={handleClearResults}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors focus:ring-2 focus:ring-gray-300 focus:ring-opacity-50"
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
-
-            {routeInfo.distances.length > 1 && (
-              <div className="mb-4">
-                <div className="flex space-x-2 overflow-x-auto pb-2">
-                  {routeInfo.distances.map(({ distance, label }) => (
-                    <button
-                      key={distance}
-                      onClick={() => handleDistanceChange(distance)}
-                      className={`px-4 py-2 rounded-lg transition-colors ${
-                        selectedDistance === distance
-                          ? "bg-blue-500 text-white"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
               </div>
             )}
-
-            <div className="bg-gray-100 rounded-lg overflow-hidden h-80 md:h-96">
-              <RouteMap
-                waypoints={waypoints}
-                currentIndex={currentIndex}
-                onIndexChange={setCurrentIndex}
-                isHovering={isHovering}
-              />
-            </div>
-
-            <HeightProfile
-              waypoints={waypoints}
-              currentIndex={currentIndex}
-              onIndexChange={setCurrentIndex}
-              onHoverChange={setIsHovering}
-            />
-
-            <div className="mt-4 text-sm text-gray-600">
-              <p className="flex items-center">
-                <Check size={16} className="mr-2 text-green-500" />
-                Route data successfully retrieved and converted. Use the
-                download button to save as GPX.
-              </p>
-            </div>
           </div>
         )}
       </div>
