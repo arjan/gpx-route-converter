@@ -8,17 +8,11 @@ A web application that converts cycling routes from [fietssport.nl](https://www.
 - Interactive map view of the route
 - Elevation profile visualization
 - Support for multiple route distances
-- Recent conversions history
-- Beautiful and responsive UI
 
 ## Tech Stack
 
-- React + TypeScript
-- Tailwind CSS for styling
-- Leaflet for map visualization
-- Vite for build tooling
-- Express.js for production server
-- Docker for containerization
+- React + TypeScript, Tailwind CSS, leaflet for Map UI
+- Vite + Express.js for production server; docker
 
 ## Getting Started
 
